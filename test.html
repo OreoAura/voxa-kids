@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voxa Kids Chat 🤖</title>
+    <style>
+        /* ---------- Body & Background ---------- */
+        body { 
+            font-family: 'Comic Sans MS', Arial, sans-serif; 
+            padding: 20px; 
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(to bottom, #a0e7e5, #b4f8c8, #fbe7c6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 { 
+            color: #ff6f61; 
+            font-size: 2.5rem; 
+            text-shadow: 2px 2px #ffe066;
+        }
+
+        /* ---------- Chat Output ---------- */
+        #output {
+            border: 3px solid #ffb3c6; 
+            padding: 15px; 
+            width: 80%; 
+            max-width: 600px;
+            height: 200px; 
+            overflow-y: auto; 
+            background: #fff9c4; 
+            border-radius: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+            font-size: 1.1rem;
+            line-height: 1.4;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        /* ---------- Input Box & Buttons ---------- */
+        input { 
+            padding: 12px; 
+            width: 60%; 
+            border-radius: 10px; 
+            border: 2px solid #ff6f61; 
+            font-size: 1rem;
+            outline: none;
+            transition: transform 0.2s ease;
+        }
+
+        input:focus {
+            transform: scale(1.05);
+            border-color: #ffa500;
+        }
+
+        button { 
+            padding: 12px 18px; 
+            border-radius: 15px; 
+            background-color: #ff6f61; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold;
+            margin-left: 5px;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        button:hover { 
+            transform: scale(1.1); 
+            background-color: #ff4c3b; 
+        }
+
+        #voiceBtn {
+            background-color: #6f9fff;
+        }
+
+        #voiceBtn:hover {
+            background-color: #4c7bff;
+        }
+
+        /* ---------- Floating stars animation ---------- */
+        .star {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: yellow;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+
+        @keyframes twinkle {
+            0% {opacity: 0.2;}
+            50% {opacity: 1;}
+            100% {opacity: 0.2;}
+        }
+
+        /* ---------- Chat card bouncing effect ---------- */
+        #chatCard {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: floatCard 2s ease-in-out infinite;
+        }
+
+        @keyframes floatCard {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+    </style>
+</head>
+<body>
+
+<h2>Voxa Kids Chat 🤖</h2>
+
+<div id="chatCard">
+    <div id="output"></div>
+
+    <div>
+        <input id="msg" type="text" placeholder="Type message here">
+        <button onclick="sendMessage()">Send</button>
+        <button id="voiceBtn">🎤 Speak</button>
+    </div>
+</div>
+
+<script>
+    // ---------- WebSocket Setup ----------
+    let socket = new WebSocket("ws://127.0.0.1:8001/live");
+
+    socket.onopen = function() {
+        console.log("WebSocket connected");
+    };
+
+    socket.onmessage = function(event) {
+        const chunk = event.data;
+        
+        // Append streamed text
+        const output = document.getElementById("output");
+        output.innerText += chunk + " ";
+
+        // Speak chunk immediately using browser TTS
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(chunk);
+            utterance.lang = 'en-US';
+            speechSynthesis.speak(utterance);
+        }
+
+        // Scroll to bottom as new message comes
+        output.scrollTop = output.scrollHeight;
+    };
+
+    socket.onerror = function(error) {
+        console.log("WebSocket error:", error);
+    };
+
+    socket.onclose = function() {
+        console.log("WebSocket closed");
+    };
+
+    // ---------- Sending Messages ----------
+    function sendMessage() {
+        const input = document.getElementById("msg");
+        const message = input.value;
+
+        if (!message.trim()) return; // ignore empty
+
+        console.log("Sending:", message);
+
+        // Clear previous response
+        document.getElementById("output").innerText = "";
+
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(message);
+        } else {
+            console.log("WebSocket not connected yet");
+        }
+
+        input.value = "";
+    }
+
+    // ---------- Voice Input ----------
+    const voiceBtn = document.getElementById("voiceBtn");
+    voiceBtn.onclick = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Speech recognition not supported in this browser.");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.start();
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            console.log("Voice input:", transcript);
+            document.getElementById("msg").value = transcript;
+            sendMessage();
+        };
+
+        recognition.onerror = (event) => {
+            console.log("Speech recognition error:", event.error);
+        };
+    };
+
+    // ---------- Floating stars for fun ----------
+    for (let i = 0; i < 30; i++) {
+        let star = document.createElement("div");
+        star.classList.add("star");
+        star.style.top = Math.random() * window.innerHeight + "px";
+        star.style.left = Math.random() * window.innerWidth + "px";
+        star.style.animationDuration = 1 + Math.random() * 2 + "s";
+        document.body.appendChild(star);
+    }
+</script>
+
+</body>
+</html>
